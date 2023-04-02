@@ -95,9 +95,19 @@ const promptGPT = async (id, title, description, genre, sceneNo, directionNo = 1
     }
 }
 
-const promptStableDiffusion = async (description, genre) => {
+const promptStableDiffusion = async (id, scene, description, genre) => {
     try {
         const prompt = `Create an image as ${genre} retrowork. The scene is as ${description}. It is a page in the ${genre} book`;
+
+        const response = await openai.createImage({
+            prompt,
+            n: 1,
+            size: "1024x1024",
+          });
+
+          console.log(response.data.data[0].url)
+        
+        await uploadImage(response.data.data[0].url, id, scene);
     }
     catch (error) {
         throw error;
