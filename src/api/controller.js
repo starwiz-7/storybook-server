@@ -1,14 +1,6 @@
 const Story = require('../models/Story');
-const cloudinary = require('cloudinary').v2;
 const { Configuration, OpenAIApi } = require("openai");
 const config = require('../config');
-
-
-cloudinary.config({
-    cloud_name: "hackbot",
-    api_key: process.env.API_KEY,
-    api_secret: process.env.API_SECRET
-});
 
 const configuration = new Configuration({
     apiKey: config.openAPIKey,
@@ -31,34 +23,17 @@ const createStory = async (req, res) => {
     }
 }
 
-const newSceneOfStory = async (id, sceneNo = 1) => {
+const routeGPT = async (req, res) => {
     try {
-        const story = await Story.findById(id);
-
-
-        const gptResponse = await promptGPT(story.id, story.title, story.description, story.genre, story.sceneNo);
-        const sdresponse = await promptStableDiffusion(gptResponse.description, gptResponse.genre);
-
-        await uploadImage(sdresponse);
-    }
-    catch (error) {
-        throw error;
-    }
-};
-
-const routeGPT = async(req, res) => {
-    try{
-        const {id, sceneNo} = req.body;
+        const { id, sceneNo } = req.body;
 
         const story = await Story.findById(id);
-
-        console.log(story)
 
         const result = await promptGPT(id, story.title, story.description, story.genre, sceneNo);
 
         return res.status(200).send(result);
     }
-    catch(error){
+    catch (error) {
         throw error;
     }
 }
@@ -79,22 +54,26 @@ const promptGPT = async (id, title, description, genre, sceneNo, directionNo = 1
 
         const completion = await openai.createChatCompletion({
             model: "gpt-3.5-turbo",
-            messages: [{ role: "user", content: prompt}],
+            messages: [{ role: "user", content: prompt }],
         });
 
         const resp = completion.data.choices[0].message.content.split('Summary:');
         response.description = resp[0];
 
         const directionCompletion = await openai.createChatCompletion({
-            model:"gpt-3.5-turbo",
-            messages:[{ role: "user", content: resp[1] + " " + "Give 2 directions in which story can proceed"}]
+            model: "gpt-3.5-turbo",
+            messages: [{ role: "user", content: resp[1] + " " + "Give 2 directions in which story can proceed" }]
         })
 
         response.directions = directionCompletion.data.choices[0].message.content;
 
         const imgUrl = await promptStableDiffusion(id, sceneNo, resp[1], genre);
 
-        await Story.findByIdAndUpdate(id, {summary: currStory.summary + " " + resp[1], story: currStory.story + "\n" + resp[0]});
+        await Story.findByIdAndUpdate(id, {
+            summary: currStory.summary + " " + resp[1], story: currStory.story + "\n" + resp[0], $push: {
+                image: imgUrl
+            }
+        });
 
         return response;
     }
@@ -111,29 +90,26 @@ const promptStableDiffusion = async (id, scene, description, genre) => {
             prompt,
             n: 1,
             size: "1024x1024",
-          });
+        });
 
-          console.log(response.data.data[0].url)
-        
-        await uploadImage(response.data.data[0].url, id, scene);
+        return response.data.data[0].url;
     }
     catch (error) {
         throw error;
     }
 }
 
-
 const getStory = async (req, res) => {
-    try{
-        const {id} = req.params;
-
-        console.log(id)
-
+    try {
+        const { id } = req.params;
+        if(!id) {
+            return res.status(422).send("Id not found");
+        }
         const result = await Story.findById(id);
-        
+
         return res.status(200).send(result);
     }
-    catch(error) {
+    catch (error) {
         throw error;
     }
 };
