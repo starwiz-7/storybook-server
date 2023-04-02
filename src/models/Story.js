@@ -16,7 +16,16 @@ const StorySchema = mongoose.Schema({
     summary:{
         type: String,
         required: false
-    }
+    },
+    story:{
+        type: String,
+        required:false
+    },
+    image:[
+        {
+            type:String,
+        }
+    ]
 });
 
 

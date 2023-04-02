@@ -48,10 +48,13 @@ const newSceneOfStory = async (id, sceneNo = 1) => {
 
 const routeGPT = async(req, res) => {
     try{
-        const {id, title, description, genre, sceneNo} = req.body;
+        const {id, sceneNo} = req.body;
 
-        // console.log(id, title, description, genre, sceneNo);
-        const result = await promptGPT(id, title, description, genre, sceneNo);
+        const story = await Story.findById(id);
+
+        console.log(story)
+
+        const result = await promptGPT(id, story.title, story.description, story.genre, sceneNo);
 
         return res.status(200).send(result);
     }
@@ -66,11 +69,12 @@ const promptGPT = async (id, title, description, genre, sceneNo, directionNo = 1
         let prompt;
 
         let response = {};
+        const currStory = await Story.findById(id);
         if (sceneNo === 1) {
-            prompt = `Create a story in 5 scenes with the title '${title}' and the description of the story is '${description}'. Let the ID for this story be 3 for further reference. Build a background around these description in this story and write a descriptive scene in 500-600 words for a comic book. Write the story for scene 1. Write story only for scene 1 and the summary in the last paragraph`;
+            prompt = `Create a story in 5 scenes with the title '${title}' and the description of the story is '${description}'. Let the ID for this story be 3 for further reference. Build a background around these description in this story and write a descriptive scene in 500-600 words for a comic book. Write story only for scene ${sceneNo} and the summary in the last paragraph`;
         }
         else {
-            prompt = `In reference to story with the id ${id}, write the story for scene ${sceneNo} in direction ${directionNo}, summary in JSON format`;
+            prompt = currStory.summary + ` In reference to story with the id ${id}, write the story for scene ${sceneNo} in direction ${directionNo}, write a descriptive scene in 500-600 words for a comic book. Write story only for scene ${sceneNo} and the summary in the last paragraph`;
         }
 
         const completion = await openai.createChatCompletion({
@@ -87,6 +91,10 @@ const promptGPT = async (id, title, description, genre, sceneNo, directionNo = 1
         })
 
         response.directions = directionCompletion.data.choices[0].message.content;
+
+        const imgUrl = await promptStableDiffusion(id, sceneNo, resp[1], genre);
+
+        await Story.findByIdAndUpdate(id, {summary: currStory.summary + " " + resp[1], story: currStory.story + "\n" + resp[0]});
 
         return response;
     }
@@ -114,23 +122,6 @@ const promptStableDiffusion = async (id, scene, description, genre) => {
     }
 }
 
-const uploadImage = async (img, id, scene) => {
-    try {
-        const res = cloudinary.uploader.upload();
-    }
-    catch (error) {
-        throw error;
-    }
-}
-
-const createPDF = async () => {
-    try {
-
-    }
-    catch (error) {
-        throw error;
-    }
-}
 
 const getStory = async (req, res) => {
     try{
@@ -138,7 +129,7 @@ const getStory = async (req, res) => {
 
         console.log(id)
 
-        // const result = await Story.findById(id);
+        const result = await Story.findById(id);
         
         return res.status(200).send(result);
     }
