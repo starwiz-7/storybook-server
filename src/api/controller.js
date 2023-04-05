@@ -67,17 +67,43 @@ const promptGPT = async (id, title, description, genre, sceneNo, directionNo = 1
 
         response.directions = directionCompletion.data.choices[0].message.content;
 
+        const imageUrlArray = [];
+
+        if(sceneNo === 1) {
+            const coverImgUrl = await createCoverImage(genre, title, currStory.summary);
+            imageUrlArray.push(coverImgUrl);
+        }
+
         const imgUrl = await promptStableDiffusion(id, sceneNo, resp[1], genre);
 
+        imageUrlArray.push(imgUrl);
+
         await Story.findByIdAndUpdate(id, {
-            summary: currStory.summary + " " + resp[1], story: currStory.story + "\n" + resp[0], $push: {
-                image: imgUrl
+            summary: currStory.summary + " " + resp[1], story: currStory.story ? currStory.story : "" + "\n" + resp[0], $push: {
+                image: imageUrlArray
             }
         });
 
         return response;
     }
     catch (error) {
+        throw error;
+    }
+}
+
+const createCoverImage = async(genre, title, summary) => {
+    try{
+        const prompt = `Create a cover image for ${genre} book. Let the title be ${title}.The summary for cover page is ${summary}`;
+
+        const response = await openai.createImage({
+            prompt,
+            n: 1,
+            size: "1024x1024",
+        });
+
+        return response.data.data[0].url;
+    }
+    catch(error){
         throw error;
     }
 }
